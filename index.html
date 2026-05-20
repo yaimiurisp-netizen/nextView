@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEXTVIEW - Streaming Dinámico</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: #141414;
+            color: #fff;
+            overflow-x: hidden;
+        }
+
+        /* Barra de Navegación */
+        header {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            padding: 20px 5%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 1000;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%);
+            transition: background 0.3s;
+        }
+
+        header.scrolled {
+            background-color: #141414;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+        }
+
+        .logo {
+            color: #E50914;
+            font-size: 1.8rem;
+            font-weight: bold;
+            letter-spacing: 1px;
+            text-decoration: none;
+        }
+
+        .controls {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        select {
+            background: rgba(0,0,0,0.6);
+            color: white;
+            border: 1px solid #555;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        /* Banner Principal */
+        .banner {
+            position: relative;
+            height: 85vh;
+            background-size: cover;
+            background-position: center center;
+            display: flex;
+            align-items: center;
+            padding: 0 5%;
+            transition: background-image 0.5s ease-in-out;
+        }
+
+        .banner-fade {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(to top, #141414 0%, rgba(20,20,20,0.2) 60%, rgba(0,0,0,0.7) 100%);
+            z-index: 1;
+        }
+
+        .banner-content {
+            max-width: 650px;
+            position: relative;
+            z-index: 2;
+        }
+
+        .banner-title {
+            font-size: 3.5rem;
+            font-weight: bold;
+            margin-bottom: 15px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.6);
+        }
+
+        .banner-description {
+            font-size: 1.1rem;
+            margin-bottom: 20px;
+            line-height: 1.4;
+            color: #e5e5e5;
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
+        }
+
+        .btn {
+            padding: 12px 26px;
+            background-color: #fff;
+            color: #000;
+            border: none;
+            font-size: 1.1rem;
+            font-weight: bold;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .btn:hover {
+            background-color: rgba(255, 255, 255, 0.75);
+        }
+
+        /* Filas de Contenido */
+        .row {
+            padding: 20px 5%;
+            position: relative;
+            z-index: 2;
+        }
+
+        .row-title {
+            font-size: 1.4rem;
+            margin-bottom: 15px;
+            font-weight: 600;
+            color: #e5e5e5;
+        }
+
+        .movies-container {
+            display: flex;
+            gap: 12px;
+            overflow-x: auto;
+            padding: 15px 0;
+            scrollbar-width: none;
+        }
+
+        .movies-container::-webkit-scrollbar {
+            display: none;
+        }
+
+        /* Tarjetas estilo Netflix (Horizontales/Backdrop) */
+        .movie-card {
+            min-width: 260px;
+            height: 146px;
+            background-size: cover;
+            background-position: center;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            position: relative;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+
+        .movie-card:hover {
+            transform: scale(1.15);
+            z-index: 10;
+        }
+
+        .movie-info-hover {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            padding: 15px 10px 10px 10px;
+            background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0) 100%);
+            font-size: 0.85rem;
+            font-weight: bold;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            border-bottom-left-radius: 4px;
+            border-bottom-right-radius: 4px;
+        }
+
+        .movie-card:hover .movie-info-hover {
+            opacity: 1;
+        }
+
+        /* Modal del Reproductor (YouTube) */
+        .video-modal {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0,0,0,0.9);
+            z-index: 2000;
+            display: none;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .video-container {
+            position: relative;
+            width: 85%;
+            max-width: 1000px;
+            aspect-ratio: 16/9;
+        }
+
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            border-radius: 8px;
+        }
+
+        .close-modal {
+            position: absolute;
+            top: -40px;
+            right: 0;
+            color: #fff;
+            font-size: 2rem;
+            cursor: pointer;
+            background: none;
+            border: none;
+        }
+    </style>
+</head>
+<body>
+
+    <header id="navbar">
+        <a href="#" class="logo">NEXTVIEW</a>
+        <div class="controls">
+            <!-- Selector de Idioma -->
+            <select id="langSelect" onchange="changeLanguage()">
+                <option value="es-ES">Español (ES)</option>
+                <option value="en-US">English (US)</option>
+            </select>
+        </div>
+    </header>
+
+    <!-- Banner Principal Inteligente -->
+    <section class="banner" id="heroBanner">
+        <div class="banner-fade"></div>
+        <div class="banner-content">
+            <h1 class="banner-title" id="bannerTitle">Cargando...</h1>
+            <p class="banner-description" id="bannerDesc">Obteniendo los mejores títulos...</p>
+            <button class="btn" id="bannerBtn">▶ Ver Tráiler</button>
+        </div>
+    </section>
+
+    <!-- Secciones de Películas de la API -->
+    <main>
+        <div class="row">
+            <h2 class="row-title" id="titleTendencias">Tendencias Globales</h2>
+            <div class="movies-container" id="trendingRow"></div>
+        </div>
+
+        <div class="row">
+            <h2 class="row-title" id="titleMejores">Las Más Valoradas</h2>
+            <div class="movies-container" id="topRatedRow"></div>
+        </div>
+
+        <div class="row">
+            <h2 class="row-title" id="titleAccion">Acción y Adrenalina</h2>
+            <div class="movies-container" id="actionRow"></div>
+        </div>
+    </main>
+
+    <!-- Reproductor Modal Inteligente -->
+    <div class="video-modal" id="videoModal">
+        <div class="video-container">
+            <button class="close-modal" onclick="closePlayer()">✕</button>
+            <iframe id="trailerPlayer" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>
+        </div>
+    </div>
+
+    <script>
+        const API_KEY = 'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI5M2U4MzE4NDE5MDFkZGEwMTg4M2VmNzYyNDI0YzczMSIsIm5iZiI6MTc3OTI5NzM0Ni4xMzMsInN1YiI6IjZhMGRlYzQyZjNlZmVkMmM5YmY4ZTUwZiIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.-jI750RTvS7U9I4qJAUYYTT60o73IIOk6a_I78FG0Zw'; 
+        
+        const BASE_URL = 'https://api.themoviedb.org/3';
+        const IMG_URL = 'https://image.tmdb.org/t/p/w500';
+        const BIG_IMG_URL = 'https://image.tmdb.org/t/p/original';
+        
+        let currentLang = document.getElementById('langSelect').value;
+
+        // Rutas específicas de la API
+        const requests = {
+            trending: () => `${BASE_URL}/trending/movie/week?api_key=${API_KEY}&language=${currentLang}`,
+            topRated: () => `${BASE_URL}/movie/top_rated?api_key=${API_KEY}&language=${currentLang}&page=1`,
+            action: () => `${BASE_URL}/discover/movie?api_key=${API_KEY}&with_genres=28&language=${currentLang}`
+        };
+
+        // Cambiar el fondo del navbar con scroll
+        window.addEventListener('scroll', () => {
+            const navbar = document.getElementById('navbar');
+            if (window.scrollY > 40) navbar.classList.add('scrolled');
+            else navbar.classList.remove('scrolled');
+        });
+
+        // Función Principal para Conectar y Traer Datos
+        async function fetchMovies(url, containerId) {
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                displayMovies(data.results, containerId);
+                return data.results;
+            } catch (error) {
+                console.error("Error cargando películas:", error);
+            }
+        }
+
+        // Mostrar películas en las filas correspondientes
+        function displayMovies(movies, containerId) {
+    const container = document.getElementById(containerId);
+    container.innerHTML = ''; // Limpiar el "Cargando..."
+
+    // 🛡️ CONTROL DE SEGURIDAD: Si movies no existe o no es una lista, detenemos el error aquí
+    if (!movies || !Array.isArray(movies) || movies.length === 0) {
+        container.innerHTML = `
+            <p style="padding: 15px; color: #aaa; font-size: 0.9rem;">
+                ⚠️ No se pudieron cargar los títulos en esta sección.
+            </p>
+        `;
+        return;
+    }
+
+    // Si todo está bien, procesa las películas normalmente
+    movies.forEach(movie => {
+        if (!movie.backdrop_path) return;
+
+        const card = document.createElement('div');
+        card.className = 'movie-card';
+        card.style.backgroundImage = `url('${IMG_URL}${movie.backdrop_path}')`;
+        card.innerHTML = `
+            <div class="movie-info-hover">
+                ${movie.title}<br>
+                <span style="color: #46d369;">★ ${movie.vote_average.toFixed(1)}</span>
+            </div>
+        `;
+        card.onclick = () => playMovieTrailer(movie.id);
+        container.appendChild(card);
+    });
+}
+
+        // Configurar el Banner Principal con la película #1 del momento
+        function setupBanner(movie) {
+            const banner = document.getElementById('heroBanner');
+            const title = document.getElementById('bannerTitle');
+            const desc = document.getElementById('bannerDesc');
+            const btn = document.getElementById('bannerBtn');
+
+            banner.style.backgroundImage = `url('${BIG_IMG_URL}${movie.backdrop_path}')`;
+            title.textContent = movie.title;
+            desc.textContent = movie.overview ? movie.overview.substring(0, 160) + '...' : 'Sin descripción disponible.';
+            btn.onclick = () => playMovieTrailer(movie.id);
+        }
+
+        // Buscar el trailer de YouTube e iniciar el reproductor
+        async function playMovieTrailer(movieId) {
+            try {
+                const videoUrl = `${BASE_URL}/movie/${movieId}/videos?api_key=${API_KEY}&language=${currentLang}`;
+                const response = await fetch(videoUrl);
+                let data = await response.json();
+                
+                // Si no encuentra trailer en español, busca el internacional en inglés
+                if (data.results.length === 0 && currentLang !== 'en-US') {
+                    const fallbackResponse = await fetch(`${BASE_URL}/movie/${movieId}/videos?api_key=${API_KEY}&language=en-US`);
+                    data = await fallbackResponse.json();
+                }
+
+                // Filtrar para encontrar un Tráiler oficial en YouTube
+                const trailer = data.results.find(vid => vid.type === 'Trailer' && vid.site === 'YouTube');
+                
+                if (trailer) {
+                    const modal = document.getElementById('videoModal');
+                    const player = document.getElementById('trailerPlayer');
+                    player.src = `https://www.youtube.com/embed/${trailer.key}?autoplay=1&modestbranding=1&rel=0`;
+                    modal.style.display = 'flex';
+                } else {
+                    alert(currentLang === 'en-US' ? "Trailer not available for this title." : "El tráiler no está disponible temporalmente.");
+                }
+            } catch (e) {
+                console.error("Error al obtener el video:", e);
+            }
+        }
+
+        function closePlayer() {
+            const modal = document.getElementById('videoModal');
+            const player = document.getElementById('trailerPlayer');
+            player.src = ''; // Detiene el video al cerrar
+            modal.style.display = 'none';
+        }
+
+        // Cambiar idioma de toda la plataforma
+        function changeLanguage() {
+            currentLang = document.getElementById('langSelect').value;
+            
+            // Traducir títulos de las filas estáticas
+            if(currentLang === 'en-US') {
+                document.getElementById('titleTendencias').textContent = "Global Trending";
+                document.getElementById('titleMejores').textContent = "Top Rated";
+                document.getElementById('titleAccion').textContent = "Action & Adrenaline";
+            } else {
+                document.getElementById('titleTendencias').textContent = "Tendencias Globales";
+                document.getElementById('titleMejores').textContent = "Las Más Valoradas";
+                document.getElementById('titleAccion').textContent = "Acción y Adrenalina";
+            }
+
+            initPlatform();
+        }
+
+        // Inicializar carga de datos de la plataforma
+        async function initPlatform() {
+            // Verificar si el usuario ya configuró su API Key
+            if (API_KEY === 'TU_API_KEY_AQUI') {
+                document.getElementById('bannerTitle').textContent = "¡Configuración Requerida!";
+                document.getElementById('bannerDesc').textContent = "Por favor, edita el código HTML e introduce tu API Key de TMDb en la línea 171 para activar NEXTVIEW.";
+                return;
+            }
+
+            const trendingMovies = await fetchMovies(requests.trending(), 'trendingRow');
+            fetchMovies(requests.topRated(), 'topRatedRow');
+            fetchMovies(requests.action(), 'actionRow');
+
+            // Poner la película más popular de la semana en el banner principal
+            if (trendingMovies && trendingMovies.length > 0) {
+                setupBanner(trendingMovies[0]);
+            }
+        }
+
+        // Arrancar la app automáticamente
+        initPlatform();
+    </script>
+</body>
+</html>
